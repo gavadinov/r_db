@@ -12,3 +12,6 @@ A distributed in memory key-value database. This is a toy database implemented a
  - [ ] **Replication**
  - [ ] **Sharding**
  - [ ] **Local Dev** (Docker?)
+
+## [Initial] High Level Design
+![Design](r_db-high-level-design.png)
