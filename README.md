@@ -3,15 +3,18 @@ A distributed in memory key-value database. This is a toy database implemented a
 
 ## Outline
 
- - [ ] **RPC** (Avro? ProtoBuf? Thrift?)
- - [ ] **Consensus** (Paxos? Raft? Zookeeper?)
+ - [ ] **RPC** (gRPC? ~~Avro?~~ ~~Thrift?~~)
+ - [ ] **Consensus** (etcd? ~~Paxos?~~ ~~Raft?~~ ~~Zookeeper?~~)
  - [ ] **Storage** (B-tree Map? Google's Swisstable? Custom Hash Map?)
- - [ ] **API** (RPC? HTTP?)
- - [ ] **Automatic Node Discovery** (Zookeeper?)
+ - [ ] **API** (RPC? ~~HTTP?~~)
+ - [ ] **Automatic Node Discovery** (etcd? Zookeeper? Kubernetes?)
+ - [ ] **Orchestration** (Kubernetes?)
  - [ ] **Client**
  - [ ] **Replication**
  - [ ] **Sharding**
- - [ ] **Local Dev** (Docker?)
+ - [ ] **Autoscaling**
+ - [ ] **Compression**
 
 ## [Initial] High Level Design
 ![Design](r_db-high-level-design.png)
+

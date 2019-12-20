@@ -4,3 +4,11 @@
 name = "r_db"
 version = "0.1.0"
 
+[[package]]
+name = "r_db-client"
+version = "0.1.0"
+
+[[package]]
+name = "r_db-front-end"
+version = "0.1.0"
+
