@@ -1,4 +1,6 @@
 #![warn(clippy::all)]
+
+mod server;
 mod storage;
 
 fn main() {

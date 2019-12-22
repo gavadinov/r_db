@@ -22,3 +22,8 @@ A distributed in memory key-value database. This is a toy database implemented a
 Atomically swap two maps
 * We can have multiple readers. The load of the db is expected to be read heavy.
 * Th readers will be super fast. Only read from the hash map and return. This means that the writer won;t have to wait long to swap the maps
+
+
+
+## Useful Materials
+* https://www.confluent.io/blog/distributed-consensus-reloaded-apache-zookeeper-and-replication-in-kafka/
