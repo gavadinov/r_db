@@ -1,7 +1,9 @@
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 type Key = Vec<u8>;
@@ -49,9 +51,10 @@ impl Reader {
         let result;
         let data = self.data();
 
-        self.increment_curr_counter();
+        let mode = self.mode.load(Acquire);
+        self.increment_counter(mode);
         result = data.get(key);
-        self.decrement_curr_counter();
+        self.decrement_counter(mode);
 
         result
     }
@@ -71,8 +74,8 @@ impl Reader {
     }
 
     #[inline]
-    fn decrement_curr_counter(&self) {
-        if self.mode.load(Acquire) {
+    fn decrement_counter(&self, mode: bool) {
+        if mode {
             self.second.fetch_sub(1, AcqRel);
         } else {
             self.first.fetch_sub(1, AcqRel);
@@ -80,8 +83,8 @@ impl Reader {
     }
 
     #[inline]
-    fn increment_curr_counter(&self) {
-        if self.mode.load(Acquire) {
+    fn increment_counter(&self, mode: bool) {
+        if mode {
             self.second.fetch_add(1, AcqRel);
         } else {
             self.first.fetch_add(1, AcqRel);
@@ -185,8 +188,8 @@ impl Shard {
         }
     }
 
-    pub fn writer(&mut self) -> MutexGuard<Writer> {
-        self.writer.lock().unwrap()
+    pub fn writer(&mut self) -> Arc<Mutex<Writer>> {
+        self.writer.clone()
     }
 
     pub fn reader(&self) -> Reader {
@@ -194,11 +197,68 @@ impl Shard {
     }
 }
 
+impl Drop for Shard {
+    fn drop(&mut self) {
+        use std::ptr;
+
+        let _handle = unsafe { Box::from_raw(self.reader.data.swap(ptr::null_mut(), Release)) };
+    }
+}
+
 #[test]
-fn t() {
+fn test_basic() {
     let mut s = Shard::new(42);
     let r = s.reader();
-    let mut w = s.writer();
+    assert_eq!(r.get(&vec![1 as u8]), None);
+    let w = s.writer();
+    let mut w = w.lock().unwrap();
     w.put(vec![1], vec![2]);
     assert_eq!(r.get(&vec![1 as u8]), Some(&vec![2 as u8]));
+    w.put(vec![1], vec![3]);
+    assert_eq!(r.get(&vec![1 as u8]), Some(&vec![3 as u8]));
+    w.delete(&vec![1 as u8]);
+    assert_eq!(r.get(&vec![1 as u8]), None);
+}
+
+#[test]
+fn test_very_busy() {
+    let mut s = Shard::new(42);
+    let n = 255 as u8;
+    let readers: Vec<_> = (0..6)
+        .map(|_| {
+            let r = s.reader();
+            thread::spawn(move || {
+                let mut i = 0;
+                while i < n {
+                    match r.get(&vec![i]) {
+                        Some(val) => {
+                            assert_eq!(val, &vec![i]);
+                            i += 1;
+                        }
+                        None => thread::yield_now(),
+                    }
+                }
+            })
+        })
+        .collect();
+
+    let writers: Vec<_> = (0..4)
+        .map(|_| {
+            let lock = s.writer();
+            thread::spawn(move || {
+                for i in 0..n {
+                    let mut w = lock.lock().unwrap();
+                    w.put(vec![i], vec![i]);
+                }
+            })
+        })
+        .collect();
+
+    for handle in readers {
+        handle.join().unwrap();
+    }
+
+    for handle in writers {
+        handle.join().unwrap();
+    }
 }
