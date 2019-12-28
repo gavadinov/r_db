@@ -1,13 +1,12 @@
 #![allow(dead_code)]
 
+use super::types::{Key, Val};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-type Key = Vec<u8>;
-type Val = Vec<u8>;
 type Map = HashMap<Key, Val>;
 
 /// A lock-free* concurrent hash map that will store the data for a single database shard.
@@ -15,13 +14,13 @@ type Map = HashMap<Key, Val>;
 /// Google's SwissTable so we get that sweet SIMD lookup performance.
 ///
 /// Heavily optimized for reads - reads will never block, writes are behind a Mutex.
-/// Instead of using a reader-writer lock which will block the reads while writing the Shard keeps
+/// Instead of using a reader-writer lock which will block the reads while writing, the Shard keeps
 /// 2 maps behind atomic pointers. The readers read from one and the writers write to the other one.
 /// After a write the two pointers are swapped and the write is replayed to she stale map.
 ///
 /// The main difficulty is keeping track of all readers that have already dereferenced a pointer to the other map.
 /// To solve this every Reader increments an Atomic counter when it dereferences the pointer -> reads -> decrements the counter.
-/// The writer swaps the two pointer and then waits for the counter for the swapped map to get to 0.
+/// The writer swaps the two pointers and then waits for the counter for the swapped map to get to 0.
 /// Then it knows that there is no one else using the map and the writes can be applied.
 ///
 /// Important disadvantage is that all data is stored twice. 'Tis the cost of performance.
@@ -62,7 +61,7 @@ impl Reader {
         }
     }
 
-    pub fn get(&self, key: &Key) -> Option<&Val> {
+    pub fn get(&self, key: &Key) -> Option<Val> {
         let result;
 
         let mode = self.mode.load(Acquire);
@@ -70,7 +69,10 @@ impl Reader {
         result = self.data().get(key);
         self.decrement_counter(mode);
 
-        result
+        match result {
+            Some(r) => Some(r.to_vec()),
+            None => None,
+        }
     }
 
     #[inline]
@@ -229,12 +231,16 @@ impl Shard {
         }
     }
 
-    pub fn writer(&mut self) -> Arc<Mutex<Writer>> {
+    pub fn writer(&self) -> Arc<Mutex<Writer>> {
         self.writer.clone()
     }
 
     pub fn reader(&self) -> Reader {
         self.reader.clone()
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 }
 
@@ -247,9 +253,10 @@ impl Drop for Shard {
         unsafe { Box::from_raw(self.reader.data.swap(ptr::null_mut(), Release)) };
     }
 }
+
 #[cfg(test)]
 mod tests {
-    use crate::storage::Shard;
+    use super::Shard;
     use std::collections::HashMap;
     use std::thread;
 
@@ -264,15 +271,15 @@ mod tests {
         let r = s.reader();
 
         for i in 0..10 {
-            assert_eq!(r.get(&vec![i as u8]), Some(&vec![i as u8]));
+            assert_eq!(r.get(&vec![i as u8]), Some(vec![i as u8]));
         }
 
         let w = s.writer();
         let mut w = w.lock().unwrap();
         w.put(vec![1], vec![2]);
-        assert_eq!(r.get(&vec![1 as u8]), Some(&vec![2 as u8]));
+        assert_eq!(r.get(&vec![1 as u8]), Some(vec![2 as u8]));
         // Check that after the swap all the data is still there
-        assert_eq!(r.get(&vec![0 as u8]), Some(&vec![0 as u8]));
+        assert_eq!(r.get(&vec![0 as u8]), Some(vec![0 as u8]));
     }
 
     #[test]
@@ -283,9 +290,9 @@ mod tests {
         let w = s.writer();
         let mut w = w.lock().unwrap();
         w.put(vec![1], vec![2]);
-        assert_eq!(r.get(&vec![1 as u8]), Some(&vec![2 as u8]));
+        assert_eq!(r.get(&vec![1 as u8]), Some(vec![2 as u8]));
         w.put(vec![1], vec![3]);
-        assert_eq!(r.get(&vec![1 as u8]), Some(&vec![3 as u8]));
+        assert_eq!(r.get(&vec![1 as u8]), Some(vec![3 as u8]));
         w.delete(&vec![1 as u8]);
         assert_eq!(r.get(&vec![1 as u8]), None);
     }
@@ -302,7 +309,7 @@ mod tests {
                     while i < n {
                         match r.get(&vec![i]) {
                             Some(val) => {
-                                assert_eq!(val, &vec![i]);
+                                assert_eq!(val, vec![i]);
                                 i += 1;
                             }
                             None => thread::yield_now(),
