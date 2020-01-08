@@ -1,0 +1,33 @@
+syntax = "proto3";
+package storage_api;
+
+service Storage {
+    rpc Get(GetRequest) returns (GetResponse) {}
+    rpc Put(PutRequest) returns (PutResponse) {}
+    rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+}
+
+message PutRequest {
+    int64 shard_id = 1;
+    string key = 2;
+    string val = 3;
+}
+
+message PutResponse {}
+
+message DeleteRequest {
+    int64 shard_id = 1;
+    int64 key = 2;
+}
+
+message DeleteResponse {}
+
+message GetRequest {
+    int64 shard_id = 1;
+    int64 key = 2;
+}
+
+message GetResponse {
+    string key = 1;
+    string val = 2;
+}

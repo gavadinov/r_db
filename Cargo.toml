@@ -2,5 +2,6 @@
 members = [
     "client",
     "front-end",
-    "db"
+    "db",
+    "proto",
 ]
