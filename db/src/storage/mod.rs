@@ -1,4 +1,3 @@
-mod shard;
-mod shard_map;
-mod thread_pool;
-mod types;
+pub mod shard;
+pub mod shard_map;
+pub mod types;

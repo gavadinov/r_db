@@ -13,8 +13,8 @@ pub struct PutResponse {}
 pub struct DeleteRequest {
     #[prost(int64, tag = "1")]
     pub shard_id: i64,
-    #[prost(int64, tag = "2")]
-    pub key: i64,
+    #[prost(string, tag = "2")]
+    pub key: std::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DeleteResponse {}
@@ -22,14 +22,12 @@ pub struct DeleteResponse {}
 pub struct GetRequest {
     #[prost(int64, tag = "1")]
     pub shard_id: i64,
-    #[prost(int64, tag = "2")]
-    pub key: i64,
+    #[prost(string, tag = "2")]
+    pub key: std::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetResponse {
     #[prost(string, tag = "1")]
-    pub key: std::string::String,
-    #[prost(string, tag = "2")]
     pub val: std::string::String,
 }
 #[doc = r" Generated server implementations."]

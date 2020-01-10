@@ -70,7 +70,8 @@ impl Reader {
         self.decrement_counter(mode);
 
         match result {
-            Some(r) => Some(r.to_vec()),
+            // TODO: This clone means an extra allocation for every read.
+            Some(r) => Some(r.clone()),
             None => None,
         }
     }
@@ -181,7 +182,7 @@ impl Writer {
         }
     }
 
-    // TODO: What if a readers is stuck holding the pointer?
+    // TODO: What if a reader is stuck holding the pointer?
     #[inline]
     fn wait(&mut self, prev_mode: bool) {
         loop {
@@ -264,37 +265,37 @@ mod tests {
     fn test_with_data() {
         let mut data = HashMap::new();
         for i in 0..10 {
-            data.insert(vec![i as u8], vec![i as u8]);
+            data.insert(i.to_string(), i.to_string());
         }
 
         let mut s = Shard::with_data(42, data);
         let r = s.reader();
 
         for i in 0..10 {
-            assert_eq!(r.get(&vec![i as u8]), Some(vec![i as u8]));
+            assert_eq!(r.get(&i.to_string()), Some(i.to_string()));
         }
 
         let w = s.writer();
         let mut w = w.lock().unwrap();
-        w.put(vec![1], vec![2]);
-        assert_eq!(r.get(&vec![1 as u8]), Some(vec![2 as u8]));
+        w.put("1".to_string(), "2".to_string());
+        assert_eq!(r.get(&"1".to_string()), Some("2".to_string()));
         // Check that after the swap all the data is still there
-        assert_eq!(r.get(&vec![0 as u8]), Some(vec![0 as u8]));
+        assert_eq!(r.get(&"0".to_string()), Some("0".to_string()));
     }
 
     #[test]
     fn test_basic() {
         let mut s = Shard::new(42);
         let r = s.reader();
-        assert_eq!(r.get(&vec![1 as u8]), None);
+        assert_eq!(r.get(&"1".to_string()), None);
         let w = s.writer();
         let mut w = w.lock().unwrap();
-        w.put(vec![1], vec![2]);
-        assert_eq!(r.get(&vec![1 as u8]), Some(vec![2 as u8]));
-        w.put(vec![1], vec![3]);
-        assert_eq!(r.get(&vec![1 as u8]), Some(vec![3 as u8]));
-        w.delete(&vec![1 as u8]);
-        assert_eq!(r.get(&vec![1 as u8]), None);
+        w.put("1".to_string(), "2".to_string());
+        assert_eq!(r.get(&"1".to_string()), Some("2".to_string()));
+        w.put("1".to_string(), "3".to_string());
+        assert_eq!(r.get(&"1".to_string()), Some("3".to_string()));
+        w.delete(&"1".to_string());
+        assert_eq!(r.get(&"1".to_string()), None);
     }
 
     #[test]
@@ -307,9 +308,9 @@ mod tests {
                 thread::spawn(move || {
                     let mut i = 0;
                     while i < n {
-                        match r.get(&vec![i]) {
+                        match r.get(&i.to_string()) {
                             Some(val) => {
-                                assert_eq!(val, vec![i]);
+                                assert_eq!(val, i.to_string());
                                 i += 1;
                             }
                             None => thread::yield_now(),
@@ -325,7 +326,7 @@ mod tests {
                 thread::spawn(move || {
                     for i in 0..n {
                         let mut w = lock.lock().unwrap();
-                        w.put(vec![i], vec![i]);
+                        w.put(i.to_string(), i.to_string());
                     }
                 })
             })

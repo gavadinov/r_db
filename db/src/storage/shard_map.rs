@@ -2,6 +2,7 @@ use super::shard::{Reader, Shard, Writer};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
+/// A HashMap behind a RW lock. The writer lock will be taken very rarely. Only when shards are added or removed.
 pub struct ShardMap {
     shards: RwLock<HashMap<usize, Shard>>,
 }
